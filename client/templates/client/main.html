@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+
+{% load static %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixa Audio</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <div id="error-message"></div>
+
+    <div id="video-container">
+        <video id="local-video" style="width: 1280px; height: 720px;" autoplay playsinline></video>
+        <video id="remote-Video" style="width: 1280px; height: 720px;" autoplay playsinline></video>
+    </div>
+
+    <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
+</body>
+</html>
