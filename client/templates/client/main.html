@@ -7,15 +7,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixa Audio</title>
+    
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+
+    <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
 </head>
 <body>
-    <div id="error-message"></div>
-
-    <div id="video-container">
-        <video id="local-video" style="width: 1280px; height: 720px;" autoplay playsinline></video>
-        <video id="remote-Video" style="width: 1280px; height: 720px;" autoplay playsinline></video>
+    <div id="btn-container">
+        <button id="btn-recording">Start Recording</button>
     </div>
+
+    <div id="error-message" style="position: absolute; bottom: 0px;color: red;"></div>
 
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
 </body>

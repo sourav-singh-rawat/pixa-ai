@@ -1,40 +1,29 @@
 console.log('Hello world!, I am main.js');
 
-const localVideoFrame = document.getElementById('local-video');
-const remoteVideoFrame = document.getElementById('remote-Video');
+const btnRecording = document.getElementById('btn-recording');
 
-var webSocket, localStream, connection1, connection2;
+var webSocket;
+var connection1, connection2;
+var recorder;
 
 // Define video constraints
 const videoConstraints = {
     audio: true,
-    video: true,
+    video: false,
 };
 
 const init = async ()=>{
-    console.log('fn: init');
+    console.log('[init]:');
     
-    await attachLocalMedia.call();
     setupWebsocket.call();
+
+    btnRecording.addEventListener('click',onPressedRecording)
 }
 
 window.onload = init
 
-const attachLocalMedia = async ()=> {
-    console.log('fn: attachLocalMedia');
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
-
-        localVideoFrame.srcObject = stream;
-        localStream = stream;
-    } catch (e) {
-        onCatch(e)
-    }
-}
-
 const setupWebsocket = ()=>{
-    console.log('fn: setupWebsocket');
+    console.log('[setupWebsocket]');
 
     let loc = window.location;
     var wsStart = 'ws://';
@@ -45,32 +34,27 @@ const setupWebsocket = ()=>{
     
     var endPoint = wsStart + loc.host + loc.pathname;
     
-    console.log(endPoint);
+    console.log(`[setupWebsocket]: ${endPoint}`);
 
     webSocket = new WebSocket(endPoint);
 
     webSocket.addEventListener('open',(e)=>{
-        console.log('Connection opened!');
-
-        webSocket.send(JSON.stringify({
-            'message':'This message is broadcasted for everyone using websocket',
-        }))
+        console.log('[setupWebsocket]:[webSocket:addEventListener:open] Connection opened!');
 
         // Setup peer-connection between two system
         peerConnection.call();
     });
     
     webSocket.addEventListener('close',(e)=>{
-        console.log('Connection closed!');
+        console.log('[setupWebsocket]:[webSocket:addEventListener:close] Connection closed!');
     });
     
     webSocket.addEventListener('error',(e)=>{
-        console.log(`Error occurred: ${e}`);
+        console.log(`[setupWebsocket]:[webSocket:addEventListener:error] Error: ${e}`);
     });
     
     webSocket.addEventListener('message',onWebsocketMessage)
 }
-
 
 const peerConnection = async ()=> {
     connection1 = new RTCPeerConnection();
@@ -82,10 +66,8 @@ const peerConnection = async ()=> {
     connection2.addEventListener('iceconnectionstatechange', e => onIceStateChange(connection2, e));
     connection2.addEventListener('track', attachRemoteMedia);
     
-    localStream.getTracks().forEach(track => connection1.addTrack(track, localStream));
-
     try {
-        console.log('connection1 createOffer start');
+        console.log('[peerConnection]: connection1 createOffer start');
 
         const offer = await connection1.createOffer({
             iceRestart: true,
@@ -99,7 +81,7 @@ const peerConnection = async ()=> {
 }
 
 const onCreateOfferSuccess = async (desc) => {
-    console.log(`Offer from connection1\nsdp: ${desc.sdp}`);
+    console.log(`[onCreateOfferSuccess]: Offer from connection1\nsdp: ${desc.sdp}`);
     try {
         await connection1.setLocalDescription(desc);
     } catch (e) {
@@ -139,19 +121,19 @@ const onIceCandidate = async (connection, event)=> {
     try {
         await (getOtherConnection(connection).addIceCandidate(event.candidate));
 
-        console.log(`${getName(connection)} addIceCandidate success`);
+        console.log(`[onIceCandidate]: ${getName(connection)} addIceCandidate success`);
     } catch (e) {
         onCatch(connection, e);
     }
 
-    console.log(`${getName(connection)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+    console.log(`[onIceCandidate]: ${getName(connection)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
 }
 
 const onIceStateChange = (connection, event) => {
     if (connection) {
-        console.log(`${getName(connection)} ICE state: ${connection.iceConnectionState}`);
+        console.log(`[onIceStateChange]: ${getName(connection)} ICE state: ${connection.iceConnectionState}`);
 
-        console.log('ICE state change event: ', event);
+        console.log('[onIceStateChange]: ICE state change event: ', event);
     }
 }
 
@@ -164,40 +146,98 @@ const getOtherConnection = (connection) => {
 }
 
 const attachRemoteMedia = (e)=> {
-    if (remoteVideoFrame.srcObject !== e.streams[0]) {
-        remoteVideoFrame.srcObject = e.streams[0];
+    // if (remoteVideoFrame.srcObject !== e.streams[0]) {
+    //     remoteVideoFrame.srcObject = e.streams[0];
+    // }
+}
+
+const onWebsocketMessage = async (event)=>{
+    console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
+
+    try {
+        const audioData = event.data;
+    
+        // Decode Base64 to binary
+        const audioBytes = atob(audioData);
+        const audioBuffer = new Uint8Array(audioBytes.length);
+        
+        for (let i = 0; i < audioBytes.length; i++) {
+            audioBuffer[i] = audioBytes.charCodeAt(i);
+        }
+        
+        // Create Blob from binary data
+        const blob = new Blob([audioBuffer], { type: 'audio/ogg' });
+
+        // Create URL from Blob
+        const audioURL = URL.createObjectURL(blob);
+
+        // Set audio element source and play
+        var player = new Audio(audioURL);
+        await player.play()
+        
+        // const audioData = event.data;
+        // const blob = new Blob([audioData], { type: 'audio/wav' });
+        // const audioURL = URL.createObjectURL(blob);
+
+        // audioElement.src = audioURL;
+        // audioElement.play();
+    } catch (e) {
+        onCatch(e)
     }
 }
 
-const onWebsocketMessage = (event)=>{
-    console.log('fn: onWebsocketMessage');
-
-    var parsedData = JSON.parse(event.data);
-
-    console.log(parsedData);
+const sendMessageToWebsocket = (payload) => {
+    webSocket.send(payload)
 }
 
-const createMediaDom = ()=>{
-    var videoContainer = document.querySelector('#video-container');
-    
-    var videoTag = document.createElement('video');
+const onPressedRecording = async ()=> {
+    console.log('[onPressedRecording]');
 
-    videoTag.id = `${Math.random()}-video`;
-    videoTag.autoplay = true;
-    videoTag.playsInline = true;
+    try {
+        if(btnRecording.innerHTML == 'Start Recording'){
+            btnRecording.disabled = true;
 
-    var videoTagWrapper = document.createElement('div');
-    
-    videoContainer.appendChild(videoTagWrapper);
+            const stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
 
-    videoTagWrapper.appendChild(videoTag);
+            recorder = new RecordRTC(stream, {
+                type: 'audio',
+                mimeType: 'audio/wav',
+                sampleRate: 44100,
+                numberOfAudioChannels: 1,
+                desiredSampRate: 16000,
+                recorderType: StereoAudioRecorder,
+                timeSlice: 500,
+                ondataavailable: (blob)=> {
+                    console.log(`[onPressedRecording]:[ondataavailable]: Audio Recorded 500ms chunk: ${blob}`)
 
-    return videoTag;
+                    sendMessageToWebsocket(blob);
+                }
+            });
+
+            await recorder.startRecording();
+
+            btnRecording.innerHTML = 'Stop Recording';
+            btnRecording.disabled = false;
+        }else if(btnRecording.innerHTML == 'Stop Recording'){
+            btnRecording.disabled = true;
+            btnRecording.innerHTML = 'Start Recording'
+
+            await recorder.stopRecording();
+
+            sendMessageToWebsocket('stop-recording');
+
+            btnRecording.disabled = false;
+        }
+    } catch (e) {
+        onCatch(e)
+    }
 }
 
 const onCatch = (error)=>{
     const errorElement = document.querySelector('#error-message');
-    errorElement.innerHTML += `<p>Something went wrong: ${error.name}</p>`;
+    errorElement.innerHTML += `<p>Error :- Something went wrong: ${error.name}</p>`;
+
+    console.log(`[onCatch]: ${error}`)
 }
 
 const disconnect = ()=> {
@@ -205,6 +245,4 @@ const disconnect = ()=> {
     connection2.close();
     connection1 = null;
     connection2 = null;
-
-    localVideoFrame.srcObject = null;
 }
