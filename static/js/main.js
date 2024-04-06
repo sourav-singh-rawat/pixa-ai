@@ -2,22 +2,16 @@ console.log('Hello world!, I am main.js');
 
 const btnRecording = document.getElementById('btn-recording');
 
-var webSocket;
+var webSocket,remote;
 var connection1, connection2;
 var recorder;
-
-// Define video constraints
-const videoConstraints = {
-    audio: true,
-    video: false,
-};
 
 const init = async ()=>{
     console.log('[init]:');
     
     setupWebsocket.call();
 
-    btnRecording.addEventListener('click',onPressedRecording)
+    btnRecording.addEventListener('click',onPressedRecording);
 }
 
 window.onload = init
@@ -64,7 +58,6 @@ const peerConnection = async ()=> {
     connection2 = new RTCPeerConnection();
     connection2.addEventListener('icecandidate', e => onIceCandidate(connection2, e));
     connection2.addEventListener('iceconnectionstatechange', e => onIceStateChange(connection2, e));
-    connection2.addEventListener('track', attachRemoteMedia);
     
     try {
         console.log('[peerConnection]: connection1 createOffer start');
@@ -145,45 +138,46 @@ const getOtherConnection = (connection) => {
     return (connection === connection1) ? connection2 : connection1;
 }
 
-const attachRemoteMedia = (e)=> {
-    // if (remoteVideoFrame.srcObject !== e.streams[0]) {
-    //     remoteVideoFrame.srcObject = e.streams[0];
-    // }
-}
-
 const onWebsocketMessage = async (event)=>{
     console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
 
-    try {
-        const audioData = event.data;
-    
-        // Decode Base64 to binary
-        const audioBytes = atob(audioData);
-        const audioBuffer = new Uint8Array(audioBytes.length);
-        
-        for (let i = 0; i < audioBytes.length; i++) {
-            audioBuffer[i] = audioBytes.charCodeAt(i);
-        }
-        
-        // Create Blob from binary data
-        const blob = new Blob([audioBuffer], { type: 'audio/ogg' });
-
-        // Create URL from Blob
-        const audioURL = URL.createObjectURL(blob);
-
-        // Set audio element source and play
-        var player = new Audio(audioURL);
-        await player.play()
-        
-        // const audioData = event.data;
-        // const blob = new Blob([audioData], { type: 'audio/wav' });
-        // const audioURL = URL.createObjectURL(blob);
-
-        // audioElement.src = audioURL;
-        // audioElement.play();
+    try {  
+        decodeAudioData(event.data);
     } catch (e) {
         onCatch(e)
     }
+}
+
+function decodeAudioData(audioData) {
+    const audioContext = new AudioContext();
+    const fileReader = new FileReader();
+
+    fileReader.onload = function() {
+        const arrayBuffer = this.result;
+        audioContext.decodeAudioData(arrayBuffer, function(decodedData) {
+            playAudioData(decodedData, audioContext);
+        }, function(error) {
+            console.error('Error decoding audio data:', error);
+        });
+    };
+
+    fileReader.onerror = function() {
+        console.error('Error reading audio data:', fileReader.error);
+    };
+
+    try {
+        console.log('Received audio data:', audioData);
+        fileReader.readAsArrayBuffer(audioData);
+    } catch (error) {
+        console.error('Error reading audio data as ArrayBuffer:', error);
+    }
+}
+
+function playAudioData(decodedData, audioContext) {
+    const sourceNode = audioContext.createBufferSource();
+    sourceNode.buffer = decodedData;
+    sourceNode.connect(audioContext.destination);
+    sourceNode.start();
 }
 
 const sendMessageToWebsocket = (payload) => {
@@ -191,14 +185,16 @@ const sendMessageToWebsocket = (payload) => {
 }
 
 const onPressedRecording = async ()=> {
-    console.log('[onPressedRecording]');
-
     try {
         if(btnRecording.innerHTML == 'Start Recording'){
+            console.log('[onPressedRecording]: Start Recording')
+
             btnRecording.disabled = true;
 
-            const stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
-
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
+            
             recorder = new RecordRTC(stream, {
                 type: 'audio',
                 mimeType: 'audio/wav',
@@ -219,6 +215,8 @@ const onPressedRecording = async ()=> {
             btnRecording.innerHTML = 'Stop Recording';
             btnRecording.disabled = false;
         }else if(btnRecording.innerHTML == 'Stop Recording'){
+            console.log('[onPressedRecording]: Stop Recording')
+
             btnRecording.disabled = true;
             btnRecording.innerHTML = 'Start Recording'
 
