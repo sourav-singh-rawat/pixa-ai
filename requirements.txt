@@ -1,0 +1,4 @@
+channels==4.0.0
+Django==5.0.3
+paho_mqtt==2.0.0
+pysilero_vad==1.0.0
