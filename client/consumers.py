@@ -3,6 +3,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 import paho.mqtt.client as mqtt
 from pysilero_vad import SileroVoiceActivityDetector
 import asyncio
+import wave
 
 # MQTT Broker settings
 mqtt_broker = "34.93.105.92"
@@ -56,6 +57,9 @@ class StreamConsumer(AsyncWebsocketConsumer):
             client.publish(f"{mqtt_topic_publish}{self.message_chunk_index}", b"##")
 
             self.message_chunk_index = 0
+
+            # await self.send(text_data='stop-consuming')
+
             return
 
         # await self.send(bytes_data=bytes_data)
@@ -107,6 +111,22 @@ class StreamConsumer(AsyncWebsocketConsumer):
             if msg.payload[-2:] == b"##":
                 print(f"[StreamConsumer]:[on_mqtt_client_message]: complete response received")
 
-                # TODO:
+                asyncio.run(self.send(text_data='stop-consuming'))
+                # self.write_to_wav(self.audio_chunks)
+                # self.audio_chunks=[]
             else:
+                # self.audio_chunks.append(msg.payload)
                 asyncio.run(self.send(bytes_data=msg.payload))
+
+    def write_to_wav(self,chunks):
+        SAMPLE_RATE = 16000
+        SAMPLE_WIDTH = 2
+        CHANNELS = 1
+
+        """Write audio chunks to a WAV file."""
+        with wave.open(f"output{len(chunks)}.wav", 'wb') as wav_file:
+            wav_file.setnchannels(CHANNELS)
+            wav_file.setsampwidth(SAMPLE_WIDTH)
+            wav_file.setframerate(SAMPLE_RATE)
+            for chunk in chunks:
+                wav_file.writeframes(chunk)

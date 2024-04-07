@@ -138,42 +138,37 @@ const getOtherConnection = (connection) => {
     return (connection === connection1) ? connection2 : connection1;
 }
 
-const onWebsocketMessage = async (event)=>{
+let audioBlobs = []
+
+const onWebsocketMessage = (event) => {
     console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
 
-    try {  
-        decodeAudioData(event.data);
-    } catch (e) {
-        onCatch(e)
-    }
-}
-
-function decodeAudioData(audioData) {
-    const audioContext = new AudioContext();
-    const fileReader = new FileReader();
-
-    fileReader.onload = function() {
-        const arrayBuffer = this.result;
-        audioContext.decodeAudioData(arrayBuffer, function(decodedData) {
-            playAudioData(decodedData, audioContext);
-        }, function(error) {
-            console.error('Error decoding audio data:', error);
-        });
-    };
-
-    fileReader.onerror = function() {
-        console.error('Error reading audio data:', fileReader.error);
-    };
-
     try {
-        console.log('Received audio data:', audioData);
-        fileReader.readAsArrayBuffer(audioData);
-    } catch (error) {
-        console.error('Error reading audio data as ArrayBuffer:', error);
+        audioBlobs.push(event.data)
+        
+        if (audioBlobs.length >= 8) {
+            const combinedBlob = new Blob(audioBlobs, { type: 'audio/wav' });
+            decodeAudioData(combinedBlob);
+            audioBlobs = []; // Clear the array for the next batch
+        }
+    } catch (e) {
+        onCatch(e);
     }
+};
+
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+const decodeAudioData = async (audioBlob) => {
+    const arrayBuffer = await new Response(audioBlob).arrayBuffer();
+
+    audioContext.decodeAudioData(arrayBuffer, function(decodedData) {
+        playAudioData(decodedData,audioContext)
+    }, function(error) {
+        console.error('Error decoding audio data:', error);
+    });
 }
 
-function playAudioData(decodedData, audioContext) {
+const playAudioData = (decodedData, audioContext)=> {
     const sourceNode = audioContext.createBufferSource();
     sourceNode.buffer = decodedData;
     sourceNode.connect(audioContext.destination);
@@ -205,7 +200,7 @@ const onPressedRecording = async ()=> {
                 timeSlice: 500,
                 ondataavailable: (blob)=> {
                     console.log(`[onPressedRecording]:[ondataavailable]: Audio Recorded 500ms chunk: ${blob}`)
-
+                    
                     sendMessageToWebsocket(blob);
                 }
             });
