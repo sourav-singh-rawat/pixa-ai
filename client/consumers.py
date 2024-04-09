@@ -99,25 +99,32 @@ class StreamConsumer(AsyncWebsocketConsumer):
 
     def on_mqtt_client_connect(self, client, user_data, flags, reason_code, properties=None):
         print(f"[StreamConsumer]:[on_mqtt_client_connect]: mqtt client connected")
-
-        # client.subscribe(mqtt_topic_data)
+        
+        # For Ai generative audio response
         client.subscribe(mqtt_topic_response)
+
+        # For Ai data gathered audio response
+        client.subscribe(mqtt_topic_data)
 
     # audio_chunks=[]
 
     def on_mqtt_client_message(self, client, user_data, msg):
         print(f"[StreamConsumer]:[on_mqtt_client_message]: Received new mqtt client message on topic:{msg.topic}: type:{type(msg.payload)} - {len(msg.payload)} bytes")
 
-        if "audio/response" in msg.topic:
-            if msg.payload[-2:] == b"##":
-                print(f"[StreamConsumer]:[on_mqtt_client_message]: complete response received")
+        if "audio/response/0" in msg.topic:
+            asyncio.run(self.send(text_data='start-generative-response'))
+        elif "audio/data/0" in msg.topic:
+            asyncio.run(self.send(text_data='start-data-response'))
 
-                asyncio.run(self.send(text_data='stop-consuming'))
-                # self.write_to_wav(self.audio_chunks)
-                # self.audio_chunks=[]
-            else:
-                # self.audio_chunks.append(msg.payload)
-                asyncio.run(self.send(bytes_data=msg.payload))
+        if msg.payload[-2:] == b"##":
+            print(f"[StreamConsumer]:[on_mqtt_client_message]: complete response received")
+
+            asyncio.run(self.send(text_data='stop-consuming'))
+            # self.write_to_wav(self.audio_chunks)
+            # self.audio_chunks=[]
+        else:
+            # self.audio_chunks.append(msg.payload)
+            asyncio.run(self.send(bytes_data=msg.payload))
 
     # def write_to_wav(self,chunks):
     #     SAMPLE_RATE = 16000
