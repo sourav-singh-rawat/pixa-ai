@@ -147,8 +147,10 @@ const getOtherConnection = (connection) => {
 
 
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-const sampleRate = 24000; // Adjust the sample rate based on your PCM format
-const bufferSize = 2048; // Adjust the buffer size based on your needs
+let bufferSource = null;
+let sampleRate = 24000; // Adjust the sample rate based on your PCM format
+let bufferSize = 2048; // Adjust the buffer size based on your needs
+let numberOfChannels = 1;
 
 let audioResponseChunks = [];
 let isConsumingAudioResponse = true;
@@ -222,6 +224,28 @@ const onWebsocketMessage = async (event) => {
         return;
     }
 
+    if(event.data == 'start-generative-response') {
+        sampleRate = 24000;
+        bufferSize = 2048;
+        numberOfChannels = 1;
+        audioResponseChunks = [];
+        isConsumingAudioResponse = true;
+
+        console.log('[onWebsocketMessage]: Start listing generative audio response')
+        return;
+    }
+
+    if(event.data == 'start-data-response') {
+        sampleRate = 44100;
+        bufferSize = 2048;
+        numberOfChannels = 2;
+        audioResponseChunks = [];
+        isConsumingAudioResponse = true;
+
+        console.log('[onWebsocketMessage]: Start listing data audio response')
+        return;
+    }
+
     if (isConsumingAudioResponse) {
         const blob = event.data;
         const arrayBuffer = await new Response(blob).arrayBuffer();
@@ -234,29 +258,40 @@ const onWebsocketMessage = async (event) => {
 };
 
 const playAudio = () => {
-  const totalLength = audioResponseChunks.reduce((length, chunk) => length + chunk.length, 0);
-
-  if (totalLength === 0) {
-    console.warn('No audio data to play.');
-    return;
-  }
-
-  const audioBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
-  let offset = 0;
-
-  for (const chunk of audioResponseChunks) {
-    const floatData = new Float32Array(chunk.length);
-    for (let i = 0; i < chunk.length; i++) {
-      floatData[i] = chunk[i] / 32768; // Convert 16-bit signed integer to float
+    if (bufferSource) {
+       stopCurrentAudio();
     }
-    audioBuffer.copyToChannel(floatData, 0, offset);
-    offset += chunk.length;
-  }
 
-  const bufferSource = audioContext.createBufferSource();
-  bufferSource.buffer = audioBuffer;
-  bufferSource.connect(audioContext.destination);
-  bufferSource.start();
+    const totalLength = audioResponseChunks.reduce((length, chunk) => length + chunk.length, 0);
+
+    if (totalLength === 0) {
+        console.warn('No audio data to play.');
+        return;
+    }
+
+    const audioBuffer = audioContext.createBuffer(numberOfChannels, totalLength, sampleRate);
+    let offset = 0;
+
+    for (const chunk of audioResponseChunks) {
+        const floatData = new Float32Array(chunk.length);
+        for (let i = 0; i < chunk.length; i++) {
+        floatData[i] = chunk[i] / 32768; // Convert 16-bit signed integer to float
+        }
+        audioBuffer.copyToChannel(floatData, 0, offset);
+        offset += chunk.length;
+    }
+
+    bufferSource = audioContext.createBufferSource();
+    bufferSource.buffer = audioBuffer;
+    bufferSource.connect(audioContext.destination);
+    bufferSource.start();
+}
+
+const stopCurrentAudio = () => {
+    if (bufferSource) {
+        bufferSource.stop();
+        bufferSource = null;
+    }
 }
 
 const sendMessageToWebsocket = (payload) => {
@@ -300,9 +335,6 @@ const onPressedRecording = async ()=> {
             btnRecording.innerHTML = 'Start Recording'
 
             await recorder.stopRecording();
-
-            audioResponseChunks = [];
-            isConsumingAudioResponse = true;
 
             sendMessageToWebsocket('stop-recording');
 
