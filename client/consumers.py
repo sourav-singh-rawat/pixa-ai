@@ -103,6 +103,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
         # client.subscribe(mqtt_topic_data)
         client.subscribe(mqtt_topic_response)
 
+    # audio_chunks=[]
 
     def on_mqtt_client_message(self, client, user_data, msg):
         print(f"[StreamConsumer]:[on_mqtt_client_message]: Received new mqtt client message on topic:{msg.topic}: type:{type(msg.payload)} - {len(msg.payload)} bytes")
@@ -118,15 +119,15 @@ class StreamConsumer(AsyncWebsocketConsumer):
                 # self.audio_chunks.append(msg.payload)
                 asyncio.run(self.send(bytes_data=msg.payload))
 
-    def write_to_wav(self,chunks):
-        SAMPLE_RATE = 16000
-        SAMPLE_WIDTH = 2
-        CHANNELS = 1
+    # def write_to_wav(self,chunks):
+    #     SAMPLE_RATE = 16000
+    #     SAMPLE_WIDTH = 2
+    #     CHANNELS = 1
 
-        """Write audio chunks to a WAV file."""
-        with wave.open(f"output{len(chunks)}.wav", 'wb') as wav_file:
-            wav_file.setnchannels(CHANNELS)
-            wav_file.setsampwidth(SAMPLE_WIDTH)
-            wav_file.setframerate(SAMPLE_RATE)
-            for chunk in chunks:
-                wav_file.writeframes(chunk)
+    #     """Write audio chunks to a WAV file."""
+    #     with wave.open(f"output{len(chunks)}.wav", 'wb') as wav_file:
+    #         wav_file.setnchannels(CHANNELS)
+    #         wav_file.setsampwidth(SAMPLE_WIDTH)
+    #         wav_file.setframerate(SAMPLE_RATE)
+    #         for chunk in chunks:
+    #             wav_file.writeframes(chunk)

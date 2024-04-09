@@ -12,6 +12,13 @@ const init = async ()=>{
     setupWebsocket.call();
 
     btnRecording.addEventListener('click',onPressedRecording);
+
+    window.addEventListener('error', (event) => {
+        if (event.message.includes('message port closed')) {
+            alert('Message port closed before a response was received.');
+            // Handle the error condition appropriately
+        }
+    });
 }
 
 window.onload = init
@@ -138,41 +145,118 @@ const getOtherConnection = (connection) => {
     return (connection === connection1) ? connection2 : connection1;
 }
 
-let audioBlobs = []
-
-const onWebsocketMessage = (event) => {
-    console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
-
-    try {
-        audioBlobs.push(event.data)
-        
-        if (audioBlobs.length >= 8) {
-            const combinedBlob = new Blob(audioBlobs, { type: 'audio/wav' });
-            decodeAudioData(combinedBlob);
-            audioBlobs = []; // Clear the array for the next batch
-        }
-    } catch (e) {
-        onCatch(e);
-    }
-};
 
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+const sampleRate = 24000; // Adjust the sample rate based on your PCM format
+const bufferSize = 2048; // Adjust the buffer size based on your needs
 
-const decodeAudioData = async (audioBlob) => {
-    const arrayBuffer = await new Response(audioBlob).arrayBuffer();
+let audioResponseChunks = [];
+let isConsumingAudioResponse = true;
 
-    audioContext.decodeAudioData(arrayBuffer, function(decodedData) {
-        playAudioData(decodedData,audioContext)
-    }, function(error) {
-        console.error('Error decoding audio data:', error);
-    });
-}
+// ############### Chunks buffer audio play ###################
 
-const playAudioData = (decodedData, audioContext)=> {
-    const sourceNode = audioContext.createBufferSource();
-    sourceNode.buffer = decodedData;
-    sourceNode.connect(audioContext.destination);
-    sourceNode.start();
+// let audioBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+// let currentWritePosition = 0;
+
+// const onWebsocketMessage =  async (event) => {
+//   console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
+//   try {
+//     if (event.data === 'stop-consuming') {
+//       return;
+//     }
+
+//     const blob = event.data;
+//     const arrayBuffer = await new Response(blob).arrayBuffer();
+
+//     const pcmData = new Int16Array(arrayBuffer);
+//     const floatData = new Float32Array(pcmData.length);
+
+//     for (let i = 0; i < pcmData.length; i++) {
+//         floatData[i] = pcmData[i] / 32768; // Convert 16-bit signed integer to float
+//     }
+
+//     const availableSpace = bufferSize - currentWritePosition;
+
+//     if (floatData.length <= availableSpace) {
+//         // If the received data fits within the remaining space in the buffer
+//         audioBuffer.copyToChannel(floatData, 0, currentWritePosition);
+//         currentWritePosition += floatData.length;
+//     } else {
+//         // If the received data exceeds the remaining space in the buffer
+//         const firstPart = floatData.subarray(0, availableSpace);
+//         const secondPart = floatData.subarray(availableSpace);
+
+//         audioBuffer.copyToChannel(firstPart, 0, currentWritePosition);
+//         currentWritePosition = secondPart.length;
+
+//         // Create a new audio buffer for the remaining data
+//         const newBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+//         newBuffer.copyToChannel(secondPart, 0);
+//         audioBuffer = newBuffer;
+//     }
+
+//     // If the buffer is full, create a buffer source and start playing
+//     if (currentWritePosition === bufferSize) {
+//         const bufferSource = audioContext.createBufferSource();
+//         bufferSource.buffer = audioBuffer;
+//         bufferSource.connect(audioContext.destination);
+//         bufferSource.start();
+
+//         // Reset the write position and create a new audio buffer
+//         currentWritePosition = 0;
+//         audioBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+//     }
+//   } catch (e) {
+//     onCatch(e);
+//   }
+// };
+
+// ############### Complete audio play ###################
+
+const onWebsocketMessage = async (event) => {
+  console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
+  try {
+    if (event.data === 'stop-consuming') {
+        isConsumingAudioResponse = false;
+        playAudio();
+        return;
+    }
+
+    if (isConsumingAudioResponse) {
+        const blob = event.data;
+        const arrayBuffer = await new Response(blob).arrayBuffer();
+        const pcmData = new Int16Array(arrayBuffer);
+        audioResponseChunks.push(pcmData);
+    }
+  } catch (e) {
+    onCatch(e);
+  }
+};
+
+const playAudio = () => {
+  const totalLength = audioResponseChunks.reduce((length, chunk) => length + chunk.length, 0);
+
+  if (totalLength === 0) {
+    console.warn('No audio data to play.');
+    return;
+  }
+
+  const audioBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
+  let offset = 0;
+
+  for (const chunk of audioResponseChunks) {
+    const floatData = new Float32Array(chunk.length);
+    for (let i = 0; i < chunk.length; i++) {
+      floatData[i] = chunk[i] / 32768; // Convert 16-bit signed integer to float
+    }
+    audioBuffer.copyToChannel(floatData, 0, offset);
+    offset += chunk.length;
+  }
+
+  const bufferSource = audioContext.createBufferSource();
+  bufferSource.buffer = audioBuffer;
+  bufferSource.connect(audioContext.destination);
+  bufferSource.start();
 }
 
 const sendMessageToWebsocket = (payload) => {
@@ -200,7 +284,7 @@ const onPressedRecording = async ()=> {
                 timeSlice: 500,
                 ondataavailable: (blob)=> {
                     console.log(`[onPressedRecording]:[ondataavailable]: Audio Recorded 500ms chunk: ${blob}`)
-                    
+
                     sendMessageToWebsocket(blob);
                 }
             });
@@ -216,6 +300,9 @@ const onPressedRecording = async ()=> {
             btnRecording.innerHTML = 'Start Recording'
 
             await recorder.stopRecording();
+
+            audioResponseChunks = [];
+            isConsumingAudioResponse = true;
 
             sendMessageToWebsocket('stop-recording');
 
