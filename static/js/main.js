@@ -157,14 +157,42 @@ let isConsumingAudioResponse = true;
 
 // ############### Chunks buffer audio play ###################
 
-// let audioBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-// let currentWritePosition = 0;
+let audioBuffer = null;
+let currentWritePosition = 0;
 
 // const onWebsocketMessage =  async (event) => {
 //   console.log(`[onWebsocketMessage]: ${event} ~> ${event.data}`);
 //   try {
 //     if (event.data === 'stop-consuming') {
 //       return;
+//     }
+
+//     if(event.data == 'start-generative-response') {
+//         sampleRate = 24000;
+//         bufferSize = 2048;
+//         numberOfChannels = 1;
+//         audioResponseChunks = [];
+//         isConsumingAudioResponse = true;
+//         audioBuffer = null;
+
+//         console.log('[onWebsocketMessage]: Start listing generative audio response')
+//         return;
+//     }
+
+//     if(event.data == 'start-data-response') {
+//         sampleRate = 88200;
+//         bufferSize = 2048;
+//         numberOfChannels = 2;
+//         audioResponseChunks = [];
+//         isConsumingAudioResponse = true;
+//         audioBuffer = null;
+
+//         console.log('[onWebsocketMessage]: Start listing data audio response')
+//         return;
+//     }
+
+//     if(audioBuffer == null){
+//         audioBuffer = audioContext.createBuffer(numberOfChannels, bufferSize, sampleRate);
 //     }
 
 //     const blob = event.data;
@@ -226,8 +254,6 @@ const onWebsocketMessage = async (event) => {
 
     if(event.data == 'start-generative-response') {
         sampleRate = 24000;
-        bufferSize = 2048;
-        numberOfChannels = 1;
         audioResponseChunks = [];
         isConsumingAudioResponse = true;
 
@@ -236,9 +262,7 @@ const onWebsocketMessage = async (event) => {
     }
 
     if(event.data == 'start-data-response') {
-        sampleRate = 44100;
-        bufferSize = 2048;
-        numberOfChannels = 2;
+        sampleRate = 88200;
         audioResponseChunks = [];
         isConsumingAudioResponse = true;
 
@@ -275,7 +299,7 @@ const playAudio = () => {
     for (const chunk of audioResponseChunks) {
         const floatData = new Float32Array(chunk.length);
         for (let i = 0; i < chunk.length; i++) {
-        floatData[i] = chunk[i] / 32768; // Convert 16-bit signed integer to float
+            floatData[i] = chunk[i] / 32768; // Convert 16-bit signed integer to float
         }
         audioBuffer.copyToChannel(floatData, 0, offset);
         offset += chunk.length;

@@ -120,16 +120,21 @@ class StreamConsumer(AsyncWebsocketConsumer):
             print(f"[StreamConsumer]:[on_mqtt_client_message]: complete response received")
 
             asyncio.run(self.send(text_data='stop-consuming'))
-            # self.write_to_wav(self.audio_chunks)
-            # self.audio_chunks=[]
+
+            # if len(self.audio_chunks) != 0:
+            #     self.write_to_wav(self.audio_chunks)
+            #     self.audio_chunks=[]
+
         else:
-            # self.audio_chunks.append(msg.payload)
             asyncio.run(self.send(bytes_data=msg.payload))
 
+            # if "audio/data" in msg.topic:
+            #     self.audio_chunks.append(msg.payload)
+
     # def write_to_wav(self,chunks):
-    #     SAMPLE_RATE = 16000
+    #     SAMPLE_RATE = 44100
     #     SAMPLE_WIDTH = 2
-    #     CHANNELS = 1
+    #     CHANNELS = 2
 
     #     """Write audio chunks to a WAV file."""
     #     with wave.open(f"output{len(chunks)}.wav", 'wb') as wav_file:
