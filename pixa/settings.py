@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-nrn$x*db@h5-3k985_ypi5jci6&kboex6h@53$0phktx&%-+ir
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['34.93.105.92']
+ALLOWED_HOSTS = ['https://71c8-103-158-213-76.ngrok-free.app']
 
 
 # Application definition
@@ -122,7 +122,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = os.path.join(BASE_DIR,'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR,'static')
 ]
@@ -150,7 +150,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("34.93.105.92", 6379)],
+            "hosts": [("https://71c8-103-158-213-76.ngrok-free.app", 6379)],
         },
     },
 }
